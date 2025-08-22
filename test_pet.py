@@ -4,11 +4,7 @@ import schemas
 import api_helpers
 from hamcrest import assert_that, contains_string, is_
 
-'''
-TODO: Finish this test by...
-1) Troubleshooting and fixing the test failure
-The purpose of this test is to validate the response matches the expected schema defined in schemas.py
-'''
+
 def test_pet_schema():
     test_endpoint = "/pets/1"
 
@@ -19,14 +15,8 @@ def test_pet_schema():
     # Validate the response schema against the defined schema in schemas.py
     validate(instance=response.json(), schema=schemas.pet)
 
-'''
-TODO: Finish this test by...
-1) Extending the parameterization to include all available statuses
-2) Validate the appropriate response code
-3) Validate the 'status' property in the response is equal to the expected status
-4) Validate the schema for each object in the response
-'''
-@pytest.mark.parametrize("status", [("available")])
+
+@pytest.mark.parametrize("status", ["available", "pending", "sold"]) #adjusted and added more statuses
 def test_find_by_status_200(status):
     test_endpoint = "/pets/findByStatus"
     params = {
@@ -34,13 +24,29 @@ def test_find_by_status_200(status):
     }
 
     response = api_helpers.get_api_data(test_endpoint, params)
-    # TODO...
+    #validates the response code
+    assert response.status_code == 200, f"Expected status code 200, got {response.status_code}"
 
-'''
-TODO: Finish this test by...
-1) Testing and validating the appropriate 404 response for /pets/{pet_id}
-2) Parameterizing the test for any edge cases
-'''
-def test_get_by_id_404():
-    # TODO...
-    pass
+    pets = response.json()
+    assert isinstance(pets, list), "Response is not a list of pets"
+
+    for pet in pets:
+        assert pet.get("status") == status, f"Expected status {status}, got {pet.get('status')}"
+        validate(instance=pet, schema=schemas.pet)
+
+#checks for a 404 response
+@pytest.mark.parametrize("invalid_id", [-1, 999999, "invalid_id"])
+def test_get_by_id_404(invalid_id): 
+    test_endpoint = f"/pets/{invalid_id}"
+
+    response = api_helpers.get_api_data(test_endpoint)
+    assert response.status_code == 404, f"Expected status code 404, got {response.status_code}"
+
+    if response.headers.get("Content-Type", "").startswith("application/json"):
+        try:
+            error_data = response.json()
+            if error_data:
+                assert "message" in error_data, "Error response should contain 'message'"
+                assert_that(error_data["message"], contains_string("not found"))
+        except ValueError:
+            pass
